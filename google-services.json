@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "268788624301",
+    "project_id": "reslio",
+    "storage_bucket": "reslio.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:268788624301:android:e8adadadbe0cb4bdea0f24",
+        "android_client_info": {
+          "package_name": "com.reslio.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjO_9XACb12iKhAhi2ZU_GdT3H-XzoKsk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
