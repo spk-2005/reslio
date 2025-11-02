@@ -1,4 +1,4 @@
-package com.reslio
+package com.reslio.app
 
 import android.app.Application
 import android.content.res.Configuration

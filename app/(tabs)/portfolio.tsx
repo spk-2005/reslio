@@ -68,12 +68,10 @@ export default function PortfolioTab() {
   const handleTemplateSelect = async (template: Template) => {
     try {
       await AdMob.showInterstitial();
-
-      Alert.alert(
-        template.name,
-        `Selected: ${template.description}\n\nIn production, this will open the data entry form.`,
-        [{ text: 'OK' }]
-      );
+      
+      // In a real implementation, you would navigate to a data entry screen,
+      // passing the template ID as a parameter.
+      router.push({ pathname: '/editor/portfolio', params: { templateId: template._id } });
     } catch (error) {
       console.error('Error selecting template:', error);
     }

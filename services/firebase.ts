@@ -1,16 +1,6 @@
-import { initializeApp } from 'firebase/app';
-import {
-  GoogleAuthProvider,
-  signInWithPopup,
-  signOut,
-  onAuthStateChanged,
-  signInWithCredential,
-  getAuth,
-  initializeAuth,
-  getReactNativePersistence,
-} from 'firebase/auth';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { initializeAuth, getAuth, getReactNativePersistence, type Auth, GoogleAuthProvider, signInWithCredential, onAuthStateChanged, type AuthCredential, type User } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -21,61 +11,22 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = initializeApp(firebaseConfig);
-// Use initializeAuth for React Native persistence
-const auth = Platform.OS === 'web'
-  ? getAuth(app)
-  : initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
-    });
-const googleProvider = new GoogleAuthProvider();
+let app: FirebaseApp;
+let auth: Auth;
 
-export const signInWithGoogle = async (idToken?: string) => {
-  try {
-    let result;
-    let token;
+if (!getApps().length) {
+  app = initializeApp(firebaseConfig);
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage),
+  });
+} else {
+  app = getApp();
+  auth = getAuth(app);
+}
 
-    if (idToken) {
-      // Native flow: We have an idToken from expo-auth-session
-      const credential = GoogleAuthProvider.credential(idToken);
-      result = await signInWithCredential(auth, credential);
-      token = idToken;
-    } else {
-      // Web flow: Use signInWithPopup
-      result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
-      token = await user.getIdToken();
-    }
+// Export the initialized services
+export { auth, app };
 
-    await AsyncStorage.setItem('userToken', token);
-
-    return {
-      user: result.user,
-      idToken: token,
-    };
-  } catch (error) {
-    console.error('Error signing in with Google:', error);
-    throw error;
-  }
-};
-
-export const signOutUser = async () => {
-  try {
-    await signOut(auth);
-    await AsyncStorage.removeItem('userToken');
-    await AsyncStorage.removeItem('userData');
-  } catch (error) {
-    console.error('Error signing out:', error);
-    throw error;
-  }
-};
-
-export const getCurrentUser = () => {
-  return auth.currentUser;
-};
-
-export const onAuthChange = (callback: (user: any) => void) => {
-  return onAuthStateChanged(auth, callback);
-};
-
-export { auth };
+// Also export any providers you might need, to ensure they come from the same SDK instance
+export { GoogleAuthProvider, signInWithCredential, onAuthStateChanged, type AuthCredential, type User };
+export default app;
