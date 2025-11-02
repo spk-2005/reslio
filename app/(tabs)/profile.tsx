@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Linking, Alert, TextInput, Switch, Modal, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Linking, Alert, TextInput, Switch, Modal, FlatList, KeyboardTypeOptions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -18,9 +18,66 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import axios from 'axios';
+
+// --- API Helper ---
+// In a real app, this would be in a separate file (e.g., services/api.ts)
+const api = axios.create({
+  baseURL: process.env.EXPO_PUBLIC_API_URL,
+  timeout: 10000,
+});
+
+// Add a request interceptor to include the auth token
+api.interceptors.request.use(async (config) => {
+  const { getAuth } = require('@react-native-firebase/auth');
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
+
+  if (currentUser) {
+    const token = await currentUser.getIdToken();
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+// --- End API Helper ---
+
+// --- Type Definitions ---
+interface PersonalDetails {
+  name?: string;
+  phone?: string;
+  location?: string;
+}
+
+interface Experience {
+  _id?: string;
+  position: string;
+  company: string;
+  type: string;
+  startDate?: string;
+  endDate?: string;
+  description?: string;
+  salary?: string;
+}
+
+interface Education {
+  _id?: string;
+  institution: string;
+  degree: string;
+  field?: string;
+  endDate?: string;
+}
+
+interface Project {
+  _id?: string;
+  name: string;
+  description?: string;
+  liveLink?: string;
+  githubLink?: string;
+}
 
 // Reusable input component for our forms
-const FormInput = ({ label, value, onChangeText, placeholder, keyboardType = 'default' }) => (
+const FormInput = ({ label, value, onChangeText, placeholder, keyboardType = 'default', editable = true }: { label: string, value: string, onChangeText: (text: string) => void, placeholder: string, keyboardType?: KeyboardTypeOptions, editable?: boolean }) => (
   <View style={styles.inputGroup}>
     <Text style={styles.inputLabel}>{label}</Text>
     <TextInput
@@ -30,23 +87,35 @@ const FormInput = ({ label, value, onChangeText, placeholder, keyboardType = 'de
       placeholder={placeholder}
       keyboardType={keyboardType}
       placeholderTextColor="#999"
+      editable={editable}
     />
   </View>
 );
 
 // Example form for Personal Details
-const PersonalDetailsForm = ({ user, onSave }) => {
-  const [name, setName] = useState(user?.displayName || '');
-  const [phone, setPhone] = useState(user?.phoneNumber || '');
-  const [location, setLocation] = useState(''); // Location isn't on the default user object
+const PersonalDetailsForm = ({ user, onSave }: { user: any, onSave: (data: any) => void }) => {
+  // Correctly initialize state from the nested personalDetails object
+  // or fallback to the root user object/empty strings.
+  const [name, setName] = useState(user?.personalDetails?.name || user?.displayName || '');
+  const [phone, setPhone] = useState(user?.personalDetails?.phone || '');
+  const [location, setLocation] = useState(user?.personalDetails?.location || '');
 
-  const handleSave = () => {
-    // In a real app, you'd call an API to save this data.
-    // For now, we'll just log it and call the onSave prop.
-    const updatedDetails = { displayName: name, phoneNumber: phone, location };
-    console.log('Saving personal details:', updatedDetails);
-    onSave(updatedDetails);
-    Alert.alert('Success', 'Personal details saved!');
+  useEffect(() => {
+    // This ensures the form updates if the user prop changes after initial render
+  }, [user]);
+
+  const handleSave = async () => {
+    try {
+      const updatedDetails = { displayName: name, phoneNumber: phone, location };
+      // Call the backend API to save the data
+      const response = await api.put('/api/profile/details', updatedDetails);
+      console.log('✅ Personal details saved:', response.data);
+      onSave(response.data); // Pass updated user data back to parent
+      Alert.alert('Success', 'Personal details saved!');
+    } catch (error) {
+      console.error('❌ Error saving personal details:', error);
+      Alert.alert('Error', 'Could not save details. Please try again.');
+    }
   };
 
   return (
@@ -62,12 +131,11 @@ const PersonalDetailsForm = ({ user, onSave }) => {
 };
 
 // Form for adding and managing Education
-const EducationForm = () => {
+const EducationForm = ({ educationList, onSave }: { educationList: Education[], onSave: (data: Education[]) => void }) => {
   const degreeTypes = ['High School', 'Diploma', 'B.E', 'B.Tech', 'M.E', 'M.Tech', 'B.Sc', 'M.Sc', 'BCA', 'MCA', 'PhD', 'Other'];
 
-  const [education, setEducation] = useState([
-    { id: 1, institution: 'State University', degree: 'B.Tech in Computer Science', field: 'Computer Science', endDate: 'May 2021' },
-  ]);
+  // Initialize state from props, or an empty array if no data exists
+  const [education, setEducation] = useState(educationList || []);
   const [isAdding, setIsAdding] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -76,13 +144,17 @@ const EducationForm = () => {
   const [field, setField] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const handleAddEducation = () => {
+  const handleAddEducation = async () => {
     if (!institution || !degree) {
       Alert.alert('Missing Fields', 'Please fill in at least Institution and Degree.');
       return;
     }
     const fullDegree = (degree !== 'High School' && degree !== 'Diploma' && field) ? `${degree} in ${field}` : degree;
-    setEducation(prev => [...prev, { id: Date.now(), institution, degree: fullDegree, field, endDate }]);
+    const newEducation = { institution, degree: fullDegree, field, endDate };
+    
+    // In a real implementation, you would call an API here to save the new entry.
+    // For now, we update the local state and call the parent onSave.
+    onSave([...education, newEducation]);
     setInstitution('');
     setDegree('B.Tech');
     setField('');
@@ -90,24 +162,26 @@ const EducationForm = () => {
     setIsAdding(false);
   };
 
-  const handleRemoveEducation = (id: number) => {
+  const handleRemoveEducation = (indexToRemove: number) => {
     Alert.alert('Delete Education', 'Are you sure you want to delete this entry?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setEducation(edu => edu.filter(e => e.id !== id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        onSave(education.filter((_: Education, index: number) => index !== indexToRemove));
+      }},
     ]);
   };
 
   return (
     <View>
-      {education.map(edu => (
-        <View key={edu.id} style={styles.listItem}>
+      {education.map((edu: Education, index: number) => (
+        <View key={index} style={styles.listItem}>
           <View style={styles.listItemContent}>
             <Text style={styles.listItemTitle}>{edu.institution}</Text>
             <Text style={styles.listItemSubtitle}>{edu.degree}</Text>
             <Text style={styles.listItemSubtitle}>Graduated: {edu.endDate}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleRemoveEducation(edu.id)}>
-            <Trash2 color="#e74c3c" size={20} />
+          <TouchableOpacity>
+            <Trash2 color="#e74c3c" size={20} onPress={() => handleRemoveEducation(index)} />
           </TouchableOpacity>
         </View>
       ))}
@@ -168,8 +242,8 @@ const EducationForm = () => {
 };
 
 // Form for adding and managing Projects
-const ProjectsForm = () => {
-  const [projects, setProjects] = useState([]);
+const ProjectsForm = ({ projectsList, onSave }: { projectsList: Project[], onSave: (data: Project[]) => void }) => {
+  const [projects, setProjects] = useState(projectsList || []);
   const [isAdding, setIsAdding] = useState(false);
 
   const [name, setName] = useState('');
@@ -182,8 +256,11 @@ const ProjectsForm = () => {
       Alert.alert('Missing Field', 'Please provide a project name.');
       return;
     }
-    const newProject = { id: Date.now(), name, description, liveLink, githubLink };
-    setProjects(prev => [...prev, newProject]);
+    const newProject = { name, description, liveLink, githubLink };
+    
+    // Call parent onSave to handle API call and state update
+    onSave([...projects, newProject]);
+
     setName('');
     setDescription('');
     setLiveLink('');
@@ -191,22 +268,24 @@ const ProjectsForm = () => {
     setIsAdding(false);
   };
 
-  const handleRemoveProject = (id: number) => {
+  const handleRemoveProject = (indexToRemove: number) => {
     Alert.alert('Delete Project', 'Are you sure you want to delete this project?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setProjects(p => p.filter(proj => proj.id !== id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        onSave(projects.filter((_: Project, index: number) => index !== indexToRemove));
+      }},
     ]);
   };
 
   return (
     <View>
-      {projects.map(proj => (
-        <View key={proj.id} style={styles.listItem}>
+      {projects.map((proj: Project, index: number) => (
+        <View key={index} style={styles.listItem}>
           <View style={styles.listItemContent}>
             <Text style={styles.listItemTitle}>{proj.name}</Text>
             <Text style={styles.listItemSubtitle} numberOfLines={2}>{proj.description}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleRemoveProject(proj.id)}>
+          <TouchableOpacity onPress={() => handleRemoveProject(index)}>
             <Trash2 color="#e74c3c" size={20} />
           </TouchableOpacity>
         </View>
@@ -236,10 +315,10 @@ const ProjectsForm = () => {
 };
 
 // Form for adding and managing Achievements
-const AchievementsForm = () => {
+const AchievementsForm = ({ achievementsList, onSave }: { achievementsList: any[], onSave: (data: any[]) => void }) => {
   const achievementTypes = ['Award', 'Certification', 'Publication', 'Patent', 'Honor', 'Other'];
 
-  const [achievements, setAchievements] = useState([]);
+  const [achievements, setAchievements] = useState(achievementsList || []);
   const [isAdding, setIsAdding] = useState(false);
 
   const [title, setTitle] = useState('');
@@ -252,8 +331,11 @@ const AchievementsForm = () => {
       Alert.alert('Missing Field', 'Please provide a name for the achievement.');
       return;
     }
-    const newAchievement = { id: Date.now(), title, type, issuer, date };
-    setAchievements(prev => [...prev, newAchievement]);
+    const newAchievement = { title, type, issuer, date };
+    
+    // Call parent onSave to handle API call and state update
+    onSave([...achievements, newAchievement]);
+
     setTitle('');
     setType('Certification');
     setIssuer('');
@@ -261,22 +343,24 @@ const AchievementsForm = () => {
     setIsAdding(false);
   };
 
-  const handleRemoveAchievement = (id: number) => {
+  const handleRemoveAchievement = (indexToRemove: number) => {
     Alert.alert('Delete Achievement', 'Are you sure you want to delete this achievement?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setAchievements(a => a.filter(ach => ach.id !== id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        onSave(achievements.filter((_: any, index: number) => index !== indexToRemove));
+      }},
     ]);
   };
 
   return (
     <View>
-      {achievements.map(ach => (
-        <View key={ach.id} style={styles.listItem}>
+      {achievements.map((ach: any, index: number) => (
+        <View key={index} style={styles.listItem}>
           <View style={styles.listItemContent}>
             <Text style={styles.listItemTitle}>{ach.title}</Text>
             <Text style={styles.listItemSubtitle}>{ach.type} {ach.issuer && `from ${ach.issuer}`}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleRemoveAchievement(ach.id)}>
+          <TouchableOpacity onPress={() => handleRemoveAchievement(index)}>
             <Trash2 color="#e74c3c" size={20} />
           </TouchableOpacity>
         </View>
@@ -317,10 +401,10 @@ const AchievementsForm = () => {
 };
 
 // Form for adding and managing Contact & Links
-const ContactLinksForm = () => {
+const ContactLinksForm = ({ linksList, onSave }: { linksList: any[], onSave: (data: any[]) => void }) => {
   const linkTypes = ['LinkedIn', 'GitHub', 'Portfolio', 'Website', 'Twitter', 'Blog', 'Other'];
 
-  const [links, setLinks] = useState([]);
+  const [links, setLinks] = useState(linksList || []);
   const [isAdding, setIsAdding] = useState(false);
 
   const [type, setType] = useState('LinkedIn');
@@ -331,29 +415,34 @@ const ContactLinksForm = () => {
       Alert.alert('Missing Fields', 'Please provide both a type and a URL.');
       return;
     }
-    const newLink = { id: Date.now(), type, url };
-    setLinks(prev => [...prev, newLink]);
+    const newLink = { type, url };
+    
+    // Call parent onSave to handle API call and state update
+    onSave([...links, newLink]);
+
     setType('LinkedIn');
     setUrl('');
     setIsAdding(false);
   };
 
-  const handleRemoveLink = (id: number) => {
+  const handleRemoveLink = (indexToRemove: number) => {
     Alert.alert('Delete Link', 'Are you sure you want to delete this link?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setLinks(l => l.filter(link => link.id !== id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        onSave(links.filter((_: any, index: number) => index !== indexToRemove));
+      }},
     ]);
   };
 
   return (
     <View>
-      {links.map(link => (
-        <View key={link.id} style={styles.listItem}>
+      {links.map((link: any, index: number) => (
+        <View key={index} style={styles.listItem}>
           <View style={styles.listItemContent}>
             <Text style={styles.listItemTitle}>{link.type}</Text>
             <Text style={styles.listItemSubtitle} numberOfLines={1}>{link.url}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleRemoveLink(link.id)}>
+          <TouchableOpacity onPress={() => handleRemoveLink(index)}>
             <Trash2 color="#e74c3c" size={20} />
           </TouchableOpacity>
         </View>
@@ -392,13 +481,11 @@ const ContactLinksForm = () => {
 };
 
 // Form for adding and managing Experience
-const ExperienceForm = () => {
+const ExperienceForm = ({ experienceList, onSave }: { experienceList: Experience[], onSave: (data: Experience[]) => void }) => {
   // In a real app, this would be fetched from your backend
   const experienceTypes = ['Job', 'Internship', 'Freelance', 'Webinar', 'Volunteering', 'Other'];
 
-  const [experiences, setExperiences] = useState([
-    { id: 1, position: 'Software Engineer', company: 'Tech Corp', type: 'Job', startDate: 'Jan 2022', endDate: 'Present', description: 'Developed and maintained web applications.' },
-  ]);
+  const [experiences, setExperiences] = useState(experienceList || []);
   const [isAdding, setIsAdding] = useState(false);
 
   const [position, setPosition] = useState('');
@@ -410,13 +497,12 @@ const ExperienceForm = () => {
   const [salary, setSalary] = useState('');
   const [description, setDescription] = useState('');
 
-  const handleAddExperience = () => {
+  const handleAddExperience = async () => {
     if (!position || !company) {
       Alert.alert('Missing Fields', 'Please fill in at least Position and Company.');
       return;
     }
-    const newExperience = {
-      id: Date.now(),
+    const newExperienceEntry = {
       position,
       company,
       type,
@@ -425,7 +511,10 @@ const ExperienceForm = () => {
       description,
       salary,
     };
-    setExperiences(prev => [...prev, newExperience]);
+    // In a real implementation, you would call an API here to save the new entry.
+    // For now, we update the local state and call the parent onSave.
+    onSave([...experiences, newExperienceEntry]);
+
     // Reset form and hide it
     setPosition('');
     setCompany('');
@@ -438,24 +527,26 @@ const ExperienceForm = () => {
     setIsAdding(false);
   };
 
-  const handleRemoveExperience = (id: number) => {
+  const handleRemoveExperience = (indexToRemove: number) => {
     Alert.alert('Delete Experience', 'Are you sure you want to delete this experience?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setExperiences(exps => exps.filter(exp => exp.id !== id)) },
+      { text: 'Delete', style: 'destructive', onPress: () => {
+        onSave(experiences.filter((_: Experience, index: number) => index !== indexToRemove));
+      }},
     ]);
   };
 
   return (
     <View>
-      {experiences.map(exp => (
-        <View key={exp.id} style={styles.listItem}>
+      {experiences.map((exp: Experience, index: number) => (
+        <View key={index} style={styles.listItem}>
           <View style={styles.listItemContent}>
             <Text style={styles.listItemTitle}>{exp.position}</Text>
             <Text style={styles.listItemSubtitle}>{exp.company} ({exp.type})</Text>
             <Text style={styles.listItemSubtitle}>{exp.startDate} - {exp.endDate}</Text>
           </View>
-          <TouchableOpacity onPress={() => handleRemoveExperience(exp.id)}>
-            <Trash2 color="#e74c3c" size={20} />
+          <TouchableOpacity>
+            <Trash2 color="#e74c3c" size={20} onPress={() => handleRemoveExperience(index)} />
           </TouchableOpacity>
         </View>
       ))}
@@ -510,7 +601,7 @@ const ExperienceForm = () => {
 };
 
 // Placeholder for other forms
-const PlaceholderForm = ({ title }) => (
+const PlaceholderForm = ({ title }: { title: string }) => (
   <View style={styles.placeholderForm}>
     <Text style={styles.placeholderText}>This is where the form for "{title}" will be.</Text>
     <Text style={styles.placeholderSubText}>You can add, edit, and remove items here.</Text>
@@ -520,6 +611,26 @@ const PlaceholderForm = ({ title }) => (
 export default function ProfileTab() {
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const [dbUser, setDbUser] = useState<any | null>(null); // State to hold full user profile from DB
+
+  useEffect(() => {
+    // Fetch the full user profile from our backend when the component mounts
+    const fetchUserProfile = async () => {
+      if (user) {
+        try {
+          console.log('🔄 Fetching user profile from backend...');
+          const response = await api.get('/api/profile');
+          setDbUser(response.data);
+          console.log('✅ User profile loaded:', response.data);
+        } catch (error) {
+          console.error('❌ Failed to fetch user profile:', error);
+          // You might want to show an error message to the user
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, [user]); // Re-fetch if the firebase user changes
 
   const handleSignOut = async () => {
     try {
@@ -568,21 +679,36 @@ export default function ProfileTab() {
   const renderFormForSection = (screenKey: string, title: string) => {
     switch (screenKey) {
       case '/profile/details':
-        return <PersonalDetailsForm user={user} onSave={(details) => {
-          // Here you would update your user object, maybe via a context update
-          // or a call to your backend, then refetch the user.
-          console.log("Updated details received in parent:", details);
+        return <PersonalDetailsForm user={dbUser} onSave={(updatedUser: any) => {
+          setDbUser(updatedUser); // Update the local state with the saved data
         }} />;
       case '/profile/experience':
-        return <ExperienceForm />;
+        return <ExperienceForm experienceList={dbUser?.experience} onSave={(updatedList: any) => {
+          // Here you would call an API to update the experience array on the backend
+          // Then update the local state:
+          setDbUser((prev: any) => ({ ...prev, experience: updatedList }));
+        }} />;
       case '/profile/education':
-        return <EducationForm />;
+        return <EducationForm educationList={dbUser?.education} onSave={(updatedList: any) => {
+          // Here you would call an API to update the education array on the backend
+          // Then update the local state:
+          setDbUser((prev: any) => ({ ...prev, education: updatedList }));
+        }} />;
       case '/profile/projects':
-        return <ProjectsForm />;
+        return <ProjectsForm projectsList={dbUser?.projects} onSave={(updatedList: any) => {
+          // API call would go here
+          setDbUser((prev: any) => ({ ...prev, projects: updatedList }));
+        }} />;
       case '/profile/achievements':
-        return <AchievementsForm />;
+        return <AchievementsForm achievementsList={dbUser?.achievements} onSave={(updatedList: any) => {
+          // API call would go here
+          setDbUser((prev: any) => ({ ...prev, achievements: updatedList }));
+        }} />;
       case '/profile/links':
-        return <ContactLinksForm />;
+        return <ContactLinksForm linksList={dbUser?.contactLinks} onSave={(updatedList: any) => {
+          // API call would go here
+          setDbUser((prev: any) => ({ ...prev, contactLinks: updatedList }));
+        }} />;
       default:
         return null;
     }
@@ -600,8 +726,8 @@ export default function ProfileTab() {
             </View>
           )}
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.displayName}</Text>
-            <Text style={styles.userEmail}>{user?.email}</Text>
+            <Text style={styles.userName}>{dbUser?.displayName || user?.displayName}</Text>
+            <Text style={styles.userEmail}>{dbUser?.email || user?.email}</Text>
           </View>
         </View>
       </LinearGradient>

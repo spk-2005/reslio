@@ -11,7 +11,7 @@ import axios from 'axios';
 interface AuthContextData {
   user: FirebaseAuthTypes.User | null;
   loading: boolean;
-  signIn: (credential: any) => Promise<void>; // AuthCredential is not exported in v22
+  signIn: (credential: any) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -24,40 +24,81 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const subscriber = onAuthStateChanged(auth, (userState) => {
-      // This callback runs once the initial auth state is determined.
       setUser(userState);
-      setLoading(false); // Always set loading to false after the check.
+      setLoading(false);
     });
-    return subscriber; // unsubscribe on unmount
+    return subscriber;
   }, [auth]);
 
   const signIn = async (credential: any) => {
     try {
+      console.log('🔄 Signing in with credential...');
       const userCredential = await signInWithCredential(auth, credential);
+      console.log('✅ Firebase credential sign-in successful');
 
-      if (userCredential.user) {
+      if (userCredential?.user) {
         // After successful Firebase sign-in, get the ID token
         const idToken = await userCredential.user.getIdToken();
+        console.log('✅ Got ID token');
 
         // Send the token to your backend to create/update the user in MongoDB
         try {
           const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-          await axios.post(`${apiUrl}/users/auth`, {}, {
-            headers: {
-              Authorization: `Bearer ${idToken}`,
+          
+          if (!apiUrl) {
+            console.error('❌ API URL is not configured');
+            throw new Error('API URL is not configured in environment variables');
+          }
+
+          console.log('🔄 Syncing with backend:', `${apiUrl}/api/auth/sync`);
+          
+          const response = await axios.post(
+            `${apiUrl}/api/auth/sync`,
+            {
+              token: idToken,
             },
+            {
+              timeout: 10000, // 10 second timeout
+            }
+          );
+          
+          console.log('✅ User synced with backend:', response.data);
+        } catch (backendError: any) {
+          console.error('❌ Backend sync error:', {
+            message: backendError?.message,
+            response: backendError?.response?.data,
+            status: backendError?.response?.status,
+            code: backendError?.code,
           });
-          console.log('✅ User synced with backend');
-        } catch (error) {
-          console.error('❌ Backend sync error:', error);
-          // If backend sync fails, we should sign the user out of Firebase
-          // to ensure a consistent state.
+          
+          // If backend sync fails, sign the user out of Firebase
           await firebaseSignOut(auth);
-          throw new Error('Failed to sync user with server.');
+          
+          // Provide a user-friendly error message
+          let errorMessage = 'Failed to sync user with server.';
+          
+          if (backendError?.response?.data?.message) {
+            errorMessage = backendError.response.data.message;
+          } else if (backendError?.message) {
+            errorMessage = backendError.message;
+          } else if (backendError?.code === 'ECONNABORTED') {
+            errorMessage = 'Server connection timeout. Please try again.';
+          } else if (backendError?.code === 'ERR_NETWORK') {
+            errorMessage = 'Network error. Please check your connection.';
+          }
+          
+          // Add the user-friendly message and re-throw
+          backendError.message = errorMessage;
+          throw backendError;
         }
       }
-    } catch (error) {
-      console.error('❌ Firebase sign-in error:', error);
+    } catch (error: any) {
+      console.error('❌ Sign-in error:', {
+        message: error?.message,
+        code: error?.code,
+        name: error?.name,
+      });
+      
       // Re-throw the error to be caught by the calling function in LoginScreen
       throw error;
     }

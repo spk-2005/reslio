@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Alert, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GoogleAuthProvider } from '@/services/firebase';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import auth from '@react-native-firebase/auth'; // ✅ Import from Firebase
 
 const LoginScreen = () => {
   const { signIn } = useAuth();
@@ -19,7 +19,6 @@ const LoginScreen = () => {
       
       // 2. Sign in
       const userInfo = await GoogleSignin.signIn();
-      console.log(userInfo);
       console.log('✅ User Info:', userInfo);
       
       if (!userInfo.idToken) {
@@ -27,7 +26,9 @@ const LoginScreen = () => {
       }
       
       // 3. Create a Firebase credential with the Google ID token
-      const googleCredential = GoogleAuthProvider.credential(userInfo.idToken);
+      // ✅ Use auth.GoogleAuthProvider from Firebase
+      const googleCredential = auth.GoogleAuthProvider.credential(userInfo.idToken);
+      console.log('✅ Created Firebase credential');
       
       // 4. Sign in to Firebase with the credential
       await signIn(googleCredential);
@@ -35,20 +36,28 @@ const LoginScreen = () => {
       
     } catch (error: any) {
       console.error('❌ Google Sign-In Error:', error);
-
-      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // User cancelled - don't show error
+      
+      // Handle Google Sign-In specific errors
+      if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
         console.log('User cancelled sign-in');
-      } else if (error.code === statusCodes.IN_PROGRESS) {
+        // No need to show an alert if the user intentionally cancelled.
+        return;
+      }
+      
+      if (error?.code === statusCodes.IN_PROGRESS) {
         Alert.alert('Sign-In In Progress', 'Please wait for the current sign-in to complete.');
-      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+      }
+      
+      if (error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
         Alert.alert('Play Services Required', 'Google Play Services is not available on this device.');
+      }
+
+      // Handle network errors specifically
+      if (error?.message === 'Network Error') {
+        Alert.alert('Network Error', 'Could not connect to the server. Please check your internet connection and try again.');
       } else {
-        Alert.alert(
-          'Sign-In Failed', 
-          error.message || 'An error occurred. Please try again.',
-          [{ text: 'OK' }]
-        );
+        // Handle all other errors
+        Alert.alert('Sign-In Failed', error?.message || 'An unexpected error occurred. Please try again.');
       }
     } finally {
       setIsSigningIn(false);

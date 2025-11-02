@@ -25,45 +25,17 @@ export default function ResumeTab() {
   const loadTemplates = async () => {
     try {
       const response = await templateAPI.getAll('resume');
-      setTemplates(response.templates || getMockTemplates());
+      // Only set templates if they are successfully fetched from the API
+      setTemplates(response.templates || []);
     } catch (error) {
       console.error('Error loading templates:', error);
-      setTemplates(getMockTemplates());
+      // In case of an error, set templates to an empty array and inform the user
+      setTemplates([]);
+      Alert.alert('Error', 'Could not load resume templates. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
-
-  const getMockTemplates = (): Template[] => [
-    {
-      _id: '1',
-      name: 'Professional',
-      description: 'Clean and modern professional resume',
-      thumbnail: 'https://images.pexels.com/photos/3184292/pexels-photo-3184292.jpeg?auto=compress&w=400',
-      isPremium: false,
-    },
-    {
-      _id: '2',
-      name: 'Creative',
-      description: 'Stand out with creative design',
-      thumbnail: 'https://images.pexels.com/photos/3184291/pexels-photo-3184291.jpeg?auto=compress&w=400',
-      isPremium: false,
-    },
-    {
-      _id: '3',
-      name: 'Executive',
-      description: 'Perfect for senior positions',
-      thumbnail: 'https://images.pexels.com/photos/3184325/pexels-photo-3184325.jpeg?auto=compress&w=400',
-      isPremium: true,
-    },
-    {
-      _id: '4',
-      name: 'Minimalist',
-      description: 'Simple and elegant design',
-      thumbnail: 'https://images.pexels.com/photos/3184338/pexels-photo-3184338.jpeg?auto=compress&w=400',
-      isPremium: false,
-    },
-  ];
 
   const handleTemplateSelect = async (template: Template) => {
     try {

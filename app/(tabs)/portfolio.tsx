@@ -25,45 +25,17 @@ export default function PortfolioTab() {
   const loadTemplates = async () => {
     try {
       const response = await templateAPI.getAll('portfolio');
-      setTemplates(response.templates || getMockTemplates());
+      // Only set templates if they are successfully fetched from the API
+      setTemplates(response.templates || []);
     } catch (error) {
       console.error('Error loading templates:', error);
-      setTemplates(getMockTemplates());
+      // In case of an error, set templates to an empty array and inform the user
+      setTemplates([]);
+      Alert.alert('Error', 'Could not load portfolio templates. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
   };
-
-  const getMockTemplates = (): Template[] => [
-    {
-      _id: '1',
-      name: 'Modern Portfolio',
-      description: 'Contemporary design with smooth animations',
-      thumbnail: 'https://images.pexels.com/photos/326503/pexels-photo-326503.jpeg?auto=compress&w=400',
-      isPremium: false,
-    },
-    {
-      _id: '2',
-      name: 'Developer Portfolio',
-      description: 'Perfect for showcasing your code projects',
-      thumbnail: 'https://images.pexels.com/photos/270348/pexels-photo-270348.jpeg?auto=compress&w=400',
-      isPremium: false,
-    },
-    {
-      _id: '3',
-      name: 'Designer Portfolio',
-      description: 'Visual-first design for creatives',
-      thumbnail: 'https://images.pexels.com/photos/196644/pexels-photo-196644.jpeg?auto=compress&w=400',
-      isPremium: true,
-    },
-    {
-      _id: '4',
-      name: 'Photography Portfolio',
-      description: 'Gallery-focused layout for photographers',
-      thumbnail: 'https://images.pexels.com/photos/1779487/pexels-photo-1779487.jpeg?auto=compress&w=400',
-      isPremium: false,
-    },
-  ];
 
   const handleTemplateSelect = async (template: Template) => {
     try {
