@@ -1,9 +1,10 @@
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRouter, useSegments, SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { useEffect } from 'react';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { useFirebaseTokenSync } from '@/hooks/useFirebaseTokenSync';
 
 // Configure Google Sign-In once when the app loads.
 GoogleSignin.configure({
@@ -13,17 +14,21 @@ GoogleSignin.configure({
 });
 
 function RootLayoutNav() {
-  const { user, loading } = useAuth();
-  console.log('user:',user);
+  const { user, loading: authLoading } = useAuth();
+  const { token, loading: tokenLoading } = useFirebaseTokenSync();
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
-    if (loading) return; // Wait until the auth state is loaded
+    const isAppReady = !authLoading && !tokenLoading;
+    if (!isAppReady) {
+      return; // Wait until both Firebase auth and our token sync are done
+    }
 
     const inAuthGroup = segments[0] === '(tabs)';
 
-    if (user) {
+    // User is logged in with Firebase AND we have a backend token
+    if (user && token) {
       // User is signed in but not in the main (tabs) group.
       // Redirect them to the home screen of the tabs.
       if (!inAuthGroup) {
@@ -36,7 +41,7 @@ function RootLayoutNav() {
       
       // If user is not signed in and not in (tabs) group, stay on the current screen (login/signup)
     }
-  }, [user, loading, segments]);
+  }, [user, token, authLoading, tokenLoading, segments]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
@@ -49,7 +54,10 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  useFrameworkReady();
+  // Keep the splash screen visible until we are ready to render.
+  // The logic in RootLayoutNav will handle hiding it.
+  // Note: useFrameworkReady is deprecated in favor of SplashScreen.preventAutoHideAsync
+  SplashScreen.preventAutoHideAsync();
 
   return (
     <AuthProvider>

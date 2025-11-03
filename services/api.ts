@@ -3,11 +3,17 @@ import * as SecureStore from 'expo-secure-store';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+// Validate API URL is configured
+if (!API_URL) {
+  console.error('EXPO_PUBLIC_API_URL is not defined in environment variables');
+}
+
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
 });
 
 // Add a request interceptor to include the auth token
@@ -24,10 +30,39 @@ api.interceptors.request.use(
   }
 );
 
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error)) {
+      if (!error.response) {
+        // Network error
+        console.error('Network error:', error.message);
+        throw new Error('Network error. Please check your internet connection.');
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const templateAPI = {
   getAll: async (type: 'resume' | 'portfolio') => {
-    const response = await api.get(`/templates?type=${type}`);
-    return response.data;
+    try {
+      const response = await api.get(`/templates?type=${type}`);
+console.log('Requesting URL:', `${API_URL}/templates?type=${type}`);
+      // Handle the backend response structure { success: true, templates: [] }
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          throw new Error('Session expired. Please log in again.');
+        }
+        if (error.response?.status === 500) {
+          throw new Error('Server error. Please try again later.');
+        }
+      }
+      throw error;
+    }
   },
 };
 
@@ -85,4 +120,4 @@ export const onboardingAPI = {
   }
 };
 
-// You can add other api groups here, like authAPI, resumeAPI, etc.
+export default api;

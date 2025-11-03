@@ -18,29 +18,7 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { FirebaseAuthTypes } from '@react-native-firebase/auth';
-import axios from 'axios';
-
-// --- API Helper ---
-// In a real app, this would be in a separate file (e.g., services/api.ts)
-const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL,
-  timeout: 10000,
-});
-
-// Add a request interceptor to include the auth token
-api.interceptors.request.use(async (config) => {
-  const { getAuth } = require('@react-native-firebase/auth');
-  const auth = getAuth();
-  const currentUser = auth.currentUser;
-
-  if (currentUser) {
-    const token = await currentUser.getIdToken();
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-// --- End API Helper ---
+import { informationAPI } from '@/services/api'; // Import the centralized API
 
 // --- Type Definitions ---
 interface PersonalDetails {
@@ -108,7 +86,7 @@ const PersonalDetailsForm = ({ user, onSave }: { user: any, onSave: (data: any) 
     try {
       const updatedDetails = { displayName: name, phoneNumber: phone, location };
       // Call the backend API to save the data
-      const response = await api.put('/api/profile/details', updatedDetails);
+      const response = await informationAPI.update({ personalDetails: updatedDetails });
       console.log('✅ Personal details saved:', response.data);
       onSave(response.data); // Pass updated user data back to parent
       Alert.alert('Success', 'Personal details saved!');
@@ -619,8 +597,8 @@ export default function ProfileTab() {
       if (user) {
         try {
           console.log('🔄 Fetching user profile from backend...');
-          const response = await api.get('/api/profile');
-          setDbUser(response.data);
+          const response = await informationAPI.get();
+          setDbUser(response.data.information); // Use the correct response structure
           console.log('✅ User profile loaded:', response.data);
         } catch (error) {
           console.error('❌ Failed to fetch user profile:', error);
@@ -680,23 +658,24 @@ export default function ProfileTab() {
     switch (screenKey) {
       case '/profile/details':
         return <PersonalDetailsForm user={dbUser} onSave={(updatedUser: any) => {
-          setDbUser(updatedUser); // Update the local state with the saved data
+          setDbUser(updatedUser.information); // Update the local state with the saved data
         }} />;
       case '/profile/experience':
         return <ExperienceForm experienceList={dbUser?.experience} onSave={(updatedList: any) => {
           // Here you would call an API to update the experience array on the backend
-          // Then update the local state:
+          informationAPI.update({ experience: updatedList });
           setDbUser((prev: any) => ({ ...prev, experience: updatedList }));
         }} />;
       case '/profile/education':
         return <EducationForm educationList={dbUser?.education} onSave={(updatedList: any) => {
           // Here you would call an API to update the education array on the backend
-          // Then update the local state:
+          informationAPI.update({ education: updatedList });
           setDbUser((prev: any) => ({ ...prev, education: updatedList }));
         }} />;
       case '/profile/projects':
         return <ProjectsForm projectsList={dbUser?.projects} onSave={(updatedList: any) => {
           // API call would go here
+          informationAPI.update({ projects: updatedList });
           setDbUser((prev: any) => ({ ...prev, projects: updatedList }));
         }} />;
       case '/profile/achievements':
@@ -707,6 +686,7 @@ export default function ProfileTab() {
       case '/profile/links':
         return <ContactLinksForm linksList={dbUser?.contactLinks} onSave={(updatedList: any) => {
           // API call would go here
+          informationAPI.update({ contactLinks: updatedList });
           setDbUser((prev: any) => ({ ...prev, contactLinks: updatedList }));
         }} />;
       default:

@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
-import { initializeAuth, getAuth, getReactNativePersistence, type Auth, GoogleAuthProvider, signInWithCredential, onAuthStateChanged, type AuthCredential, type User } from 'firebase/auth';
+import { initializeAuth, getAuth, getReactNativePersistence, type Auth, GoogleAuthProvider, signInWithCredential, onAuthStateChanged, signOut, type AuthCredential, type User } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const firebaseConfig = {
@@ -28,5 +28,5 @@ if (!getApps().length) {
 export { auth, app };
 
 // Also export any providers you might need, to ensure they come from the same SDK instance
-export { GoogleAuthProvider, signInWithCredential, onAuthStateChanged, type AuthCredential, type User };
+export { GoogleAuthProvider, signInWithCredential, onAuthStateChanged, signOut, type AuthCredential, type User };
 export default app;

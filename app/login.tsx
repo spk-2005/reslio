@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Alert, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
-import auth from '@react-native-firebase/auth'; // ✅ Import from Firebase
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin'; // For the sign-in UI
+import { GoogleAuthProvider } from '@/services/firebase'; // ✅ Import the modular provider
 
 const LoginScreen = () => {
   const { signIn } = useAuth();
@@ -26,8 +26,8 @@ const LoginScreen = () => {
       }
       
       // 3. Create a Firebase credential with the Google ID token
-      // ✅ Use auth.GoogleAuthProvider from Firebase
-      const googleCredential = auth.GoogleAuthProvider.credential(userInfo.idToken);
+      // ✅ Use the modular GoogleAuthProvider to create the credential
+      const googleCredential = GoogleAuthProvider.credential(userInfo.idToken);
       console.log('✅ Created Firebase credential');
       
       // 4. Sign in to Firebase with the credential

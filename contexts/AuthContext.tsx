@@ -1,12 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import {
-  getAuth,
   onAuthStateChanged,
   signInWithCredential,
-  signOut as firebaseSignOut,
+  signOut,
   type FirebaseAuthTypes,
-} from '@react-native-firebase/auth';
-import axios from 'axios';
+} from 'firebase/auth';
+import { auth } from '@/services/firebase'; // Import the initialized auth instance
 
 interface AuthContextData {
   user: FirebaseAuthTypes.User | null;
@@ -20,7 +19,6 @@ const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
   const [loading, setLoading] = useState(true);
-  const auth = getAuth();
 
   useEffect(() => {
     const subscriber = onAuthStateChanged(auth, (userState) => {
@@ -34,64 +32,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       console.log('🔄 Signing in with credential...');
       const userCredential = await signInWithCredential(auth, credential);
-      console.log('✅ Firebase credential sign-in successful');
-
-      if (userCredential?.user) {
-        // After successful Firebase sign-in, get the ID token
-        const idToken = await userCredential.user.getIdToken();
-        console.log('✅ Got ID token');
-
-        // Send the token to your backend to create/update the user in MongoDB
-        try {
-          const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-          
-          if (!apiUrl) {
-            console.error('❌ API URL is not configured');
-            throw new Error('API URL is not configured in environment variables');
-          }
-
-          console.log('🔄 Syncing with backend:', `${apiUrl}/api/auth/sync`);
-          
-          const response = await axios.post(
-            `${apiUrl}/api/auth/sync`,
-            {
-              token: idToken,
-            },
-            {
-              timeout: 10000, // 10 second timeout
-            }
-          );
-          
-          console.log('✅ User synced with backend:', response.data);
-        } catch (backendError: any) {
-          console.error('❌ Backend sync error:', {
-            message: backendError?.message,
-            response: backendError?.response?.data,
-            status: backendError?.response?.status,
-            code: backendError?.code,
-          });
-          
-          // If backend sync fails, sign the user out of Firebase
-          await firebaseSignOut(auth);
-          
-          // Provide a user-friendly error message
-          let errorMessage = 'Failed to sync user with server.';
-          
-          if (backendError?.response?.data?.message) {
-            errorMessage = backendError.response.data.message;
-          } else if (backendError?.message) {
-            errorMessage = backendError.message;
-          } else if (backendError?.code === 'ECONNABORTED') {
-            errorMessage = 'Server connection timeout. Please try again.';
-          } else if (backendError?.code === 'ERR_NETWORK') {
-            errorMessage = 'Network error. Please check your connection.';
-          }
-          
-          // Add the user-friendly message and re-throw
-          backendError.message = errorMessage;
-          throw backendError;
-        }
-      }
+      console.log('✅ Firebase credential sign-in successful.');
+      // The useFirebaseTokenSync hook will now handle syncing with the backend
+      // and storing the token automatically.
     } catch (error: any) {
       console.error('❌ Sign-in error:', {
         message: error?.message,
@@ -105,7 +48,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    await signOut(auth);
+    // The useFirebaseTokenSync hook will automatically remove the
+    // backend token from SecureStore upon sign-out.
+    console.log('✅ Firebase sign-out successful.');
   };
 
   return (
