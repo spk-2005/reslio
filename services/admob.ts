@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
-const INTERSTITIAL_AD_ID = process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID || 'ca-app-pub-3940256099942544/1033173712';
-const REWARDED_AD_ID = process.env.EXPO_PUBLIC_ADMOB_REWARDED_ID || 'ca-app-pub-3940256099942544/5224354917';
+const INTERSTITIAL_AD_ID = process.env.EXPO_PUBLIC_ADMOB_INTERSTITIAL_ID;
+const REWARDED_AD_ID = process.env.EXPO_PUBLIC_ADMOB_REWARDED_ID ;
 
 export const showInterstitialAd = async (): Promise<void> => {
   return new Promise((resolve) => {

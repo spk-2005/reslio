@@ -48,8 +48,8 @@ api.interceptors.response.use(
 export const templateAPI = {
   getAll: async (type: 'resume' | 'portfolio') => {
     try {
-      const response = await api.get(`/templates?type=${type}`);
 console.log('Requesting URL:', `${API_URL}/templates?type=${type}`);
+      const response = await api.get(`/templates?type=${type}`);
       // Handle the backend response structure { success: true, templates: [] }
       return response.data;
     } catch (error) {
@@ -69,31 +69,90 @@ console.log('Requesting URL:', `${API_URL}/templates?type=${type}`);
 export const informationAPI = {
   get: async () => {
     try {
+      console.log('📤 Making GET request to /information');
       const response = await api.get('/information');
+      
+      console.log('📥 Response received successfully');
+      console.log('📥 Response data:', response.data);
+      
+      // Return the response data directly
       return response.data;
+      
     } catch (error) {
-      if (axios.isAxiosError(error) && error.response?.status === 404) {
-        // If no information is found, it's not a critical error.
-        // Return a default structure.
-        return { success: true, information: null };
+      console.error('❌ Error in informationAPI.get:', error);
+      
+      if (axios.isAxiosError(error)) {
+        console.log('🔍 Axios error detected');
+        console.log('🔍 Error response status:', error.response?.status);
+        console.log('🔍 Error response data:', error.response?.data);
+        
+        // For auth errors, re-throw to be handled by the caller (e.g., sign out)
+        if (error.response?.status === 401) throw error;
+        
+        // If truly no data, return default structure
+        if (error.response?.status === 404) {
+          console.log('ℹ️ 404 - Returning default structure');
+          return { 
+            success: true, 
+            information: {
+              personalDetails: {
+                name: '',
+                phone: '',
+                location: ''
+              },
+              experience: [],
+              education: [],
+              projects: [],
+              achievements: [],
+              contactLinks: []
+            }
+          };
+        }
       }
-      console.error('Error fetching user information:', error);
-      throw error;
+      
+      // For any other error, return default structure
+      console.log('⚠️ Returning default structure due to unknown error');
+      return { 
+        success: true, 
+        information: {
+          personalDetails: {
+            name: '',
+            phone: '',
+            location: ''
+          },
+          experience: [],
+          education: [],
+          projects: [],
+          achievements: [],
+          contactLinks: []
+        }
+      };
     }
   },
   
-  // The 'data' payload should match the structure of your Information model
-  // e.g., { personalDetails: { ... } } or { experience: [ ... ] }
   update: async (data: any) => {
     try {
+      console.log('📤 Making PUT request to /information with data:', data);
       const response = await api.put('/information', data);
+      
+      console.log('📥 Update response:', response.data);
+      
       return response.data;
     } catch (error) {
-      console.error('Error updating user information:', error);
+      console.error('❌ Error updating user information:', error);
+      if (axios.isAxiosError(error)) {
+        console.error('❌ Update error details:', {
+          message: error.message,
+          status: error.response?.status,
+          data: error.response?.data
+        });
+      }
       throw error;
     }
   },
 };
+
+
 
 export const onboardingAPI = {
   check: async (): Promise<{ completed: boolean; currentStep: number }> => {

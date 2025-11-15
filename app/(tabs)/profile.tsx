@@ -18,7 +18,7 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { informationAPI } from '@/services/api'; // Import the centralized API
+import { informationAPI } from '@/services/api'; // Import the dedicated information API
 
 // --- Type Definitions ---
 interface PersonalDetails {
@@ -72,35 +72,52 @@ const FormInput = ({ label, value, onChangeText, placeholder, keyboardType = 'de
 
 // Example form for Personal Details
 const PersonalDetailsForm = ({ user, onSave }: { user: any, onSave: (data: any) => void }) => {
-  // Correctly initialize state from the nested personalDetails object
-  // or fallback to the root user object/empty strings.
+  // Initialize state from the correct nested path
   const [name, setName] = useState(user?.personalDetails?.name || user?.displayName || '');
-  const [phone, setPhone] = useState(user?.personalDetails?.phone || '');
+  const [phone, setPhone] = useState(user?.personalDetails?.phone || user?.phoneNumber || '');
   const [location, setLocation] = useState(user?.personalDetails?.location || '');
 
+  // Update state when user prop changes
   useEffect(() => {
-    // This ensures the form updates if the user prop changes after initial render
+    setName(user?.personalDetails?.name || user?.displayName || '');
+    setPhone(user?.personalDetails?.phone || user?.phoneNumber || '');
+    setLocation(user?.personalDetails?.location || '');
   }, [user]);
 
-  const handleSave = async () => {
-    try {
-      const updatedDetails = { displayName: name, phoneNumber: phone, location };
-      // Call the backend API to save the data
-      const response = await informationAPI.update({ personalDetails: updatedDetails });
-      console.log('✅ Personal details saved:', response.data);
-      onSave(response.data); // Pass updated user data back to parent
-      Alert.alert('Success', 'Personal details saved!');
-    } catch (error) {
-      console.error('❌ Error saving personal details:', error);
-      Alert.alert('Error', 'Could not save details. Please try again.');
-    }
-  };
-
+const handleSave = async () => {
+  try {
+    const updatedDetails = {
+      personalDetails: { name, phone, location }
+    };
+    const response = await informationAPI.update(updatedDetails);
+    onSave(response.data.information);
+    Alert.alert('Success', 'Personal details saved!');
+  } catch (error) {
+    console.error('❌ Error saving personal details:', error);
+    Alert.alert('Error', 'Could not save details. Please try again.');
+  }
+};
   return (
     <View>
-      <FormInput label="Full Name" value={name} onChangeText={setName} placeholder="e.g., Jane Doe" />
-      <FormInput label="Phone Number" value={phone} onChangeText={setPhone} placeholder="e.g., +1 123 456 7890" keyboardType="phone-pad" />
-      <FormInput label="Location" value={location} onChangeText={setLocation} placeholder="e.g., San Francisco, CA" />
+      <FormInput 
+        label="Full Name" 
+        value={name} 
+        onChangeText={setName} 
+        placeholder="e.g., Jane Doe" 
+      />
+      <FormInput 
+        label="Phone Number" 
+        value={phone} 
+        onChangeText={setPhone} 
+        placeholder="e.g., +1 123 456 7890" 
+        keyboardType="phone-pad" 
+      />
+      <FormInput 
+        label="Location" 
+        value={location} 
+        onChangeText={setLocation} 
+        placeholder="e.g., San Francisco, CA" 
+      />
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save Details</Text>
       </TouchableOpacity>
@@ -591,24 +608,22 @@ export default function ProfileTab() {
   const { user, signOut } = useAuth();
   const [dbUser, setDbUser] = useState<any | null>(null); // State to hold full user profile from DB
 
-  useEffect(() => {
-    // Fetch the full user profile from our backend when the component mounts
-    const fetchUserProfile = async () => {
-      if (user) {
-        try {
-          console.log('🔄 Fetching user profile from backend...');
-          const response = await informationAPI.get();
-          setDbUser(response.data.information); // Use the correct response structure
-          console.log('✅ User profile loaded:', response.data);
-        } catch (error) {
-          console.error('❌ Failed to fetch user profile:', error);
-          // You might want to show an error message to the user
-        }
+useEffect(() => {
+  const fetchUserProfile = async () => {
+    if (user) {
+      try {
+        console.log('🔄 Fetching user profile from backend...');
+        const response = await informationAPI.get();
+        setDbUser(response.information);
+        console.log('✅ User profile loaded:', response.data);
+      } catch (error) {
+        console.error('❌ Failed to fetch user profile:', error);
       }
-    };
+    }
+  };
+  fetchUserProfile();
+}, [user]);
 
-    fetchUserProfile();
-  }, [user]); // Re-fetch if the firebase user changes
 
   const handleSignOut = async () => {
     try {
@@ -654,45 +669,104 @@ export default function ProfileTab() {
     setOpenSection(prev => (prev === screenKey ? null : screenKey));
   };
 
-  const renderFormForSection = (screenKey: string, title: string) => {
-    switch (screenKey) {
-      case '/profile/details':
-        return <PersonalDetailsForm user={dbUser} onSave={(updatedUser: any) => {
-          setDbUser(updatedUser.information); // Update the local state with the saved data
-        }} />;
-      case '/profile/experience':
-        return <ExperienceForm experienceList={dbUser?.experience} onSave={(updatedList: any) => {
-          // Here you would call an API to update the experience array on the backend
-          informationAPI.update({ experience: updatedList });
-          setDbUser((prev: any) => ({ ...prev, experience: updatedList }));
-        }} />;
-      case '/profile/education':
-        return <EducationForm educationList={dbUser?.education} onSave={(updatedList: any) => {
-          // Here you would call an API to update the education array on the backend
-          informationAPI.update({ education: updatedList });
-          setDbUser((prev: any) => ({ ...prev, education: updatedList }));
-        }} />;
-      case '/profile/projects':
-        return <ProjectsForm projectsList={dbUser?.projects} onSave={(updatedList: any) => {
-          // API call would go here
-          informationAPI.update({ projects: updatedList });
-          setDbUser((prev: any) => ({ ...prev, projects: updatedList }));
-        }} />;
-      case '/profile/achievements':
-        return <AchievementsForm achievementsList={dbUser?.achievements} onSave={(updatedList: any) => {
-          // API call would go here
-          setDbUser((prev: any) => ({ ...prev, achievements: updatedList }));
-        }} />;
-      case '/profile/links':
-        return <ContactLinksForm linksList={dbUser?.contactLinks} onSave={(updatedList: any) => {
-          // API call would go here
-          informationAPI.update({ contactLinks: updatedList });
-          setDbUser((prev: any) => ({ ...prev, contactLinks: updatedList }));
-        }} />;
-      default:
-        return null;
-    }
-  };
+
+const renderFormForSection = (screenKey: string, title: string) => {
+  switch (screenKey) {
+    case '/profile/details':
+      return (
+        <PersonalDetailsForm 
+          user={dbUser} 
+          onSave={(updatedUser: any) => {
+            // The full user object is returned, so we set it directly
+            setDbUser(updatedUser); 
+          }} 
+        />
+      );
+      
+    case '/profile/experience':
+      return (
+        <ExperienceForm 
+          experienceList={dbUser?.experience} 
+          onSave={async (updatedList: any) => {
+            try {
+              const response = await informationAPI.update({ experience: updatedList });
+              setDbUser(response.data.information);
+            } catch (error) {
+              console.error('❌ Error updating experience:', error);
+              Alert.alert('Error', 'Could not save experience. Please try again.');
+            }
+          }} 
+        />
+      );
+      
+    case '/profile/education':
+      return (
+        <EducationForm 
+          educationList={dbUser?.education} 
+          onSave={async (updatedList: any) => {
+            try {
+              const response = await informationAPI.update({ education: updatedList });
+              setDbUser(response.data.information);
+            } catch (error) {
+              console.error('❌ Error updating education:', error);
+              Alert.alert('Error', 'Could not save education. Please try again.');
+            }
+          }} 
+        />
+      );
+      
+    case '/profile/projects':
+      return (
+        <ProjectsForm 
+          projectsList={dbUser?.projects} 
+          onSave={async (updatedList: any) => {
+            try {
+              const response = await informationAPI.update({ projects: updatedList });
+              setDbUser(response.data.information);
+            } catch (error) {
+              console.error('❌ Error updating projects:', error);
+              Alert.alert('Error', 'Could not save projects. Please try again.');
+            }
+          }} 
+        />
+      );
+      
+    case '/profile/achievements':
+      return (
+        <AchievementsForm 
+          achievementsList={dbUser?.achievements} 
+          onSave={async (updatedList: any) => {
+            try {
+              const response = await informationAPI.update({ achievements: updatedList });
+              setDbUser(response.data.information);
+            } catch (error) {
+              console.error('❌ Error updating achievements:', error);
+              Alert.alert('Error', 'Could not save achievements. Please try again.');
+            }
+          }} 
+        />
+      );
+      
+    case '/profile/links':
+      return (
+        <ContactLinksForm 
+          linksList={dbUser?.contactLinks} 
+          onSave={async (updatedList: any) => {
+            try {
+              const response = await informationAPI.update({ contactLinks: updatedList });
+              setDbUser(response.data.information);
+            } catch (error) {
+              console.error('❌ Error updating links:', error);
+              Alert.alert('Error', 'Could not save links. Please try again.');
+            }
+          }} 
+        />
+      );
+      
+    default:
+      return null;
+  }
+};
 
   return (
     <ScrollView style={styles.container}>
