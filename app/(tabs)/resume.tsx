@@ -1,9 +1,11 @@
+//(tabs)/resume.tsx
+
 import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { templateAPI } from '@/services/api';
-import { AdMob } from '@/services/admob';
 import { Plus } from 'lucide-react-native';
+
 
 interface Template {
   _id: string;
@@ -17,6 +19,7 @@ export default function ResumeTab() {
   const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  
 
   useEffect(() => {
     loadTemplates();
@@ -37,9 +40,9 @@ export default function ResumeTab() {
     }
   };
 
-  const handleTemplateSelect = async (template: Template) => {
-    try {
-      await AdMob.showInterstitial();
+const handleTemplateSelect = (template: Template) => {
+  try {
+      
       
       // In a real implementation, you would navigate to a data entry screen,
       // passing the template ID as a parameter.
@@ -47,7 +50,7 @@ export default function ResumeTab() {
     } catch (error) {
       console.error('Error selecting template:', error);
     }
-  };
+};
 
   if (loading) {
     return (

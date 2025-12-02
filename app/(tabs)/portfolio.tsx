@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { templateAPI } from '@/services/api';
-import { AdMob } from '@/services/admob';
 import { Plus } from 'lucide-react-native';
+
 
 interface Template {
   _id: string;
@@ -17,6 +17,7 @@ export default function PortfolioTab() {
   const router = useRouter();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
+  
 
   useEffect(() => {
     loadTemplates();
@@ -37,16 +38,15 @@ export default function PortfolioTab() {
     }
   };
 
-  const handleTemplateSelect = async (template: Template) => {
-    try {
-      await AdMob.showInterstitial();
-      
-      // In a real implementation, you would navigate to a data entry screen,
-      // passing the template ID as a parameter.
-      router.push({ pathname: '/editor/portfolio', params: { templateId: template._id } });
-    } catch (error) {
-      console.error('Error selecting template:', error);
+  const handleTemplateSelect = (template: Template) => {
+    
+    try{
+    router.push({ pathname: '/editor/portfolio', params: { templateId: template._id } });
     }
+    catch{
+      console.error('error');
+    }
+
   };
 
   if (loading) {

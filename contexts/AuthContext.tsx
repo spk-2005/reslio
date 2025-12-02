@@ -2,56 +2,67 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import {
   onAuthStateChanged,
   signInWithCredential,
-  signOut,
-  type FirebaseAuthTypes,
+  signOut as firebaseSignOut,
+  type User,
+  type AuthCredential,
 } from 'firebase/auth';
-import { auth } from '@/services/firebase'; // Import the initialized auth instance
+import { auth } from '@/services/firebase'; // Firebase auth instance
+import api from '@/services/api'; // Your backend API client
+import * as SecureStore from 'expo-secure-store'; // To store the backend token
 
 interface AuthContextData {
-  user: FirebaseAuthTypes.User | null;
+  user: User | null;
   loading: boolean;
-  signIn: (credential: any) => Promise<void>;
+  signIn: (credential: AuthCredential) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextData>({} as AuthContextData);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const subscriber = onAuthStateChanged(auth, (userState) => {
+    const unsubscribe = onAuthStateChanged(auth, (userState) => {
       setUser(userState);
       setLoading(false);
     });
-    return subscriber;
-  }, [auth]);
 
-  const signIn = async (credential: any) => {
+    return unsubscribe;
+  }, []); // no auth in deps
+
+  const signIn = async (credential: AuthCredential) => {
     try {
       console.log('🔄 Signing in with credential...');
       const userCredential = await signInWithCredential(auth, credential);
-      console.log('✅ Firebase credential sign-in successful.');
-      // The useFirebaseTokenSync hook will now handle syncing with the backend
-      // and storing the token automatically.
+      const firebaseUser = userCredential.user;
+      console.log('✅ Firebase sign-in successful.');
+
+      if (firebaseUser) {
+        console.log('🔄 Getting Firebase ID token...');
+        const idToken = await firebaseUser.getIdToken();
+
+        console.log('🔄 Syncing with backend at /auth/login...');
+        const response = await api.post('/auth/login', { token: idToken });
+        const { token: backendToken } = response.data;
+
+        if (backendToken) {
+          await SecureStore.setItemAsync('userToken', backendToken);
+          console.log('✅ Backend token stored successfully.');
+        }
+      }
     } catch (error: any) {
-      console.error('❌ Sign-in error:', {
-        message: error?.message,
-        code: error?.code,
-        name: error?.name,
-      });
-      
-      // Re-throw the error to be caught by the calling function in LoginScreen
+      console.error('❌ Sign-in or backend sync error:', error);
       throw error;
     }
   };
 
   const signOut = async () => {
-    await signOut(auth);
-    // The useFirebaseTokenSync hook will automatically remove the
-    // backend token from SecureStore upon sign-out.
+    await firebaseSignOut(auth);
     console.log('✅ Firebase sign-out successful.');
+    // Also clear the backend token from storage
+    await SecureStore.deleteItemAsync('userToken');
   };
 
   return (

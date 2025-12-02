@@ -19,8 +19,11 @@ const api = axios.create({
 // Add a request interceptor to include the auth token
 api.interceptors.request.use(
   async (config) => {
+    console.log(`[API Interceptor] Making request to: ${config.url}`);
     const token = await SecureStore.getItemAsync('userToken');
     if (token) {
+      // To debug, you can log a snippet of the token, but NEVER the full token.
+      console.log(`[API Interceptor] Attaching token: Bearer ${token.substring(0, 15)}...`);
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -61,6 +64,24 @@ console.log('Requesting URL:', `${API_URL}/templates?type=${type}`);
           throw new Error('Server error. Please try again later.');
         }
       }
+      throw error;
+    }
+  },
+  getById: async (id: string) => {
+    try {
+      console.log('Requesting URL:', `${API_URL}/templates/${id}`);
+      const response = await api.get(`/templates/${id}`);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401) {
+          throw new Error('Session expired. Please log in again.');
+        }
+        if (error.response?.status === 404) {
+          throw new Error(`Template with ID ${id} not found.`);
+        }
+      }
+      // Re-throw other errors to be handled by the caller
       throw error;
     }
   },

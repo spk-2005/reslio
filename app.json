@@ -5,17 +5,45 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "com.reslio.app",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
+
     "plugins": [
       "expo-router",
       "@react-native-firebase/app",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Reslio to automatically detect your current location for easier profile setup.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
     ],
+
     "android": {
       "package": "com.reslio.app",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "config": {},
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "minSdkVersion": 23,
+      "targetSdkVersion": 34
+    },
+
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "52c14afd-6a94-471e-8e76-92ab031788f6"
+      }
     }
   }
 }
